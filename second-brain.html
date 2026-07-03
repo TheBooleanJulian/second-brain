@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Second Brain — Constellation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#050508;
+    --panel:#0a0e14;
+    --panel2:#0d1219;
+    --teal:#00D4C8;
+    --teal-dim:rgba(0,212,200,0.35);
+    --gold:#F5C842;
+    --text:#e8e8ec;
+    --text-dim:#8a8f9c;
+    --text-faint:#4c525f;
+    --border:rgba(255,255,255,0.08);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{
+    background:var(--void);
+    color:var(--text);
+    font-family:'Space Grotesk',sans-serif;
+    height:100%;
+    overflow:hidden;
+  }
+  body{
+    background:
+      radial-gradient(ellipse at 20% 10%, rgba(0,212,200,0.05), transparent 50%),
+      radial-gradient(ellipse at 80% 90%, rgba(245,200,66,0.04), transparent 50%),
+      var(--void);
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  #app{position:relative; width:100vw; height:100vh;}
+
+  /* ---------- Header ---------- */
+  header{
+    position:fixed; top:0; left:0; right:0; z-index:20;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:20px 28px;
+    pointer-events:none;
+  }
+  header > *{pointer-events:auto;}
+  .brand{display:flex; flex-direction:column; gap:2px;}
+  .brand .eyebrow{font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.18em; color:var(--teal); text-transform:uppercase;}
+  .brand h1{font-size:19px; font-weight:600; letter-spacing:-0.01em;}
+  .header-actions{display:flex; gap:10px;}
+  .btn{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    letter-spacing:0.03em;
+    background:transparent;
+    color:var(--text-dim);
+    border:1px solid var(--border);
+    padding:9px 14px;
+    border-radius:3px;
+    cursor:pointer;
+    transition:border-color .2s, color .2s, background .2s;
+  }
+  .btn:hover{border-color:var(--teal-dim); color:var(--teal);}
+  .btn.primary{color:var(--void); background:var(--teal); border-color:var(--teal); font-weight:600;}
+  .btn.primary:hover{background:#1ee0d4;}
+  .btn:focus-visible, textarea:focus-visible, input:focus-visible{outline:2px solid var(--teal); outline-offset:2px;}
+
+  /* ---------- Stats strip ---------- */
+  .stats{
+    position:fixed; bottom:24px; left:28px; z-index:20;
+    display:flex; gap:22px;
+    font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-faint);
+  }
+  .stats b{color:var(--text-dim); font-weight:600;}
+  .stats .stat-val{color:var(--gold);}
+
+  /* ---------- Constellation ---------- */
+  #sky{position:absolute; inset:0; width:100%; height:100%; cursor:default;}
+  .node-label{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:13px;
+    fill:var(--text-dim);
+    text-anchor:middle;
+    pointer-events:none;
+    transition:fill .3s;
+  }
+  .node-sub{
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px;
+    fill:var(--text-faint);
+    text-anchor:middle;
+    pointer-events:none;
+    letter-spacing:.05em;
+  }
+  .node-group{cursor:pointer;}
+  .node-group:hover .node-label{fill:var(--teal);}
+  .node-group:hover circle.halo{opacity:0.9;}
+
+  /* ---------- Interview Drawer ---------- */
+  #drawer{
+    position:fixed; top:0; right:0; bottom:0;
+    width:min(460px, 100vw);
+    background:var(--panel);
+    border-left:1px solid var(--border);
+    display:flex; flex-direction:column;
+    transform:translateX(100%);
+    transition:transform .35s cubic-bezier(.22,.9,.3,1);
+    z-index:30;
+  }
+  #drawer.open{transform:translateX(0);}
+  .drawer-head{
+    padding:20px 22px 16px;
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:flex-start; justify-content:space-between;
+    flex-shrink:0;
+  }
+  .drawer-head .dtitle{font-size:17px; font-weight:600;}
+  .drawer-head .ddesc{font-size:12px; color:var(--text-dim); margin-top:4px; max-width:340px; line-height:1.5;}
+  .close-btn{background:none; border:none; color:var(--text-faint); font-size:20px; cursor:pointer; line-height:1; padding:4px;}
+  .close-btn:hover{color:var(--text);}
+
+  .chat{flex:1; overflow-y:auto; padding:18px 22px; display:flex; flex-direction:column; gap:14px;}
+  .chat::-webkit-scrollbar{width:6px;}
+  .chat::-webkit-scrollbar-thumb{background:var(--border); border-radius:3px;}
+
+  .bubble{
+    max-width:88%;
+    padding:11px 14px;
+    border-radius:8px;
+    font-size:13.5px;
+    line-height:1.55;
+  }
+  .bubble.ai{
+    align-self:flex-start;
+    background:var(--panel2);
+    border:1px solid var(--border);
+    color:var(--text);
+  }
+  .bubble.user{
+    align-self:flex-end;
+    background:rgba(0,212,200,0.1);
+    border:1px solid var(--teal-dim);
+    color:var(--text);
+  }
+  .distilled-tag{
+    align-self:flex-start;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px;
+    color:var(--gold);
+    display:flex; align-items:flex-start; gap:6px;
+    max-width:88%;
+    line-height:1.5;
+    padding-left:2px;
+  }
+  .distilled-tag .mark{flex-shrink:0;}
+  .thinking{align-self:flex-start; color:var(--text-faint); font-family:'JetBrains Mono',monospace; font-size:11.5px; display:flex; gap:6px; align-items:center;}
+  .dot{width:5px; height:5px; border-radius:50%; background:var(--teal); animation:pulse 1.2s infinite ease-in-out;}
+  .dot:nth-child(2){animation-delay:.15s;} .dot:nth-child(3){animation-delay:.3s;}
+  @keyframes pulse{0%,80%,100%{opacity:.25; transform:scale(0.8);} 40%{opacity:1; transform:scale(1);}}
+
+  .saturated-note{
+    align-self:center; text-align:center;
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--text-faint);
+    padding:8px 0; letter-spacing:.03em;
+  }
+
+  .composer{
+    border-top:1px solid var(--border);
+    padding:14px 18px;
+    display:flex; gap:10px; align-items:flex-end;
+    flex-shrink:0;
+  }
+  textarea{
+    flex:1; resize:none; background:var(--void); color:var(--text);
+    border:1px solid var(--border); border-radius:6px; padding:10px 12px;
+    font-family:'Space Grotesk',sans-serif; font-size:13.5px; line-height:1.4;
+    max-height:120px; min-height:42px;
+  }
+  textarea::placeholder{color:var(--text-faint);}
+  .send-btn{
+    background:var(--teal); color:var(--void); border:none; border-radius:6px;
+    width:42px; height:42px; flex-shrink:0; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .2s, opacity .2s;
+  }
+  .send-btn:hover{background:#1ee0d4;}
+  .send-btn:disabled{opacity:.35; cursor:not-allowed;}
+
+  /* ---------- Overlay ---------- */
+  #overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.5);
+    opacity:0; pointer-events:none; transition:opacity .3s; z-index:25;
+  }
+  #overlay.show{opacity:1; pointer-events:auto;}
+
+  /* ---------- Document viewer ---------- */
+  #docview{
+    position:fixed; top:0; left:0; bottom:0;
+    width:min(640px, 100vw);
+    background:var(--panel); border-right:1px solid var(--border);
+    transform:translateX(-100%); transition:transform .35s cubic-bezier(.22,.9,.3,1);
+    z-index:30; display:flex; flex-direction:column;
+  }
+  #docview.open{transform:translateX(0);}
+  .doc-head{padding:20px 24px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0;}
+  .doc-head h2{font-size:16px; font-weight:600;}
+  .doc-actions{display:flex; gap:8px;}
+  #mdpre{
+    flex:1; overflow-y:auto; padding:22px 26px;
+    font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:1.75;
+    color:var(--text-dim); white-space:pre-wrap; word-wrap:break-word;
+  }
+  #mdpre::-webkit-scrollbar{width:6px;}
+  #mdpre::-webkit-scrollbar-thumb{background:var(--border); border-radius:3px;}
+  #mdpre .h1{color:var(--text); font-weight:700;}
+  #mdpre .h2{color:var(--teal);}
+  #mdpre .meta{color:var(--text-faint); font-style:italic;}
+  #mdpre .bullet{color:var(--gold);}
+
+  .empty-doc{color:var(--text-faint); font-size:12.5px; padding:22px 26px; font-family:'JetBrains Mono',monospace; line-height:1.7;}
+
+  @media (max-width:640px){
+    #drawer, #docview{width:100vw;}
+    header{padding:16px 18px;}
+    .stats{left:18px; bottom:18px; font-size:10px; gap:14px;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.001s !important; transition-duration:.001s !important;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <span class="eyebrow">Second Brain</span>
+      <h1>Your Constellation</h1>
+    </div>
+    <div class="header-actions">
+      <button class="btn" id="viewDocBtn">Read document</button>
+      <button class="btn primary" id="downloadBtn">Download .md</button>
+    </div>
+  </header>
+
+  <svg id="sky" viewBox="0 0 900 900" preserveAspectRatio="xMidYMid meet"></svg>
+
+  <div class="stats">
+    <span><b class="stat-val" id="statPoints">0</b> data points</span>
+    <span><b class="stat-val" id="statDomains">0</b>/10 domains touched</span>
+  </div>
+
+  <div id="overlay"></div>
+
+  <div id="drawer">
+    <div class="drawer-head">
+      <div>
+        <div class="dtitle" id="dTitle">Domain</div>
+        <div class="ddesc" id="dDesc">Description</div>
+      </div>
+      <button class="close-btn" id="closeDrawer" aria-label="Close">✕</button>
+    </div>
+    <div class="chat" id="chatLog"></div>
+    <div class="composer">
+      <textarea id="answerInput" placeholder="Type your answer…" rows="1"></textarea>
+      <button class="send-btn" id="sendBtn" aria-label="Send">↑</button>
+    </div>
+  </div>
+
+  <div id="docview">
+    <div class="doc-head">
+      <h2>The Document</h2>
+      <div class="doc-actions">
+        <button class="btn" id="copyBtn">Copy</button>
+        <button class="btn primary" id="downloadBtn2">Download</button>
+      </div>
+    </div>
+    <div id="mdpre"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  const DOMAINS = [
+    {id:'origins',   name:'Origins',    desc:'Background, upbringing, formative places and people.', seed:"Where did you grow up, and what's one detail about that place that still shapes how you see the world?"},
+    {id:'values',    name:'Values',     desc:'Core beliefs and the principles you actually live by.', seed:"What's a principle you'd defend even if it cost you something — money, comfort, or approval?"},
+    {id:'mind',      name:'Mind',       desc:'How you think, reason, and process the world.', seed:"When you're stuck on a hard problem, what does your process actually look like — pacing, sketching, talking it out?"},
+    {id:'craft',     name:'Craft',      desc:'Your work, skills, and what mastery means to you.', seed:"What's a skill you've built that took years to get good at, and what kept you going during the plateau?"},
+    {id:'people',    name:'People',     desc:'Relationships — who matters, and why.', seed:"Who's someone who changed how you operate, and what specifically did they change?"},
+    {id:'rhythms',   name:'Rhythms',    desc:'Habits, daily patterns, energy — how you actually spend a day.', seed:"Walk me through what a genuinely good ordinary day looks like for you, start to finish."},
+    {id:'taste',     name:'Taste',      desc:'Aesthetics and preference — what draws you in.', seed:"What's something you're drawn to aesthetically that you can't fully explain — a color, sound, shape, mood?"},
+    {id:'shadows',   name:'Shadows',    desc:'Fears, struggles, and blind spots.', seed:"What's something you're quietly working on about yourself right now?"},
+    {id:'direction', name:'Direction',  desc:"Goals, ambitions, and the future you're building toward.", seed:"If things go right over the next five years, what does \"right\" actually look like — specifically?"},
+    {id:'meaning',   name:'Meaning',    desc:'Worldview and what makes life feel worthwhile.', seed:"What's a moment that made you feel like your life meant something? What made it land?"}
+  ];
+
+  let state = null;
+  let activeDomain = null;
+  let sending = false;
+
+  const $ = (id) => document.getElementById(id);
+  const sky = $('sky');
+  const drawer = $('drawer');
+  const overlay = $('overlay');
+  const docview = $('docview');
+  const chatLog = $('chatLog');
+  const answerInput = $('answerInput');
+
+  function defaultState(){
+    const domains = {};
+    DOMAINS.forEach(d => { domains[d.id] = { distilled: [], depth: 0, messages: [], saturated: false }; });
+    return { domains, createdAt: new Date().toISOString() };
+  }
+
+  async function loadState(){
+    try{
+      const res = await window.storage.get('second-brain-profile', false);
+      if(res && res.value){
+        const parsed = JSON.parse(res.value);
+        DOMAINS.forEach(d => { if(!parsed.domains[d.id]) parsed.domains[d.id] = { distilled:[], depth:0, messages:[], saturated:false }; });
+        state = parsed;
+      } else {
+        state = defaultState();
+      }
+    }catch(e){
+      state = defaultState();
+    }
+    render();
+  }
+
+  async function saveState(){
+    try{
+      await window.storage.set('second-brain-profile', JSON.stringify(state), false);
+    }catch(e){
+      console.error('Storage save failed', e);
+    }
+  }
+
+  // ---------- Constellation rendering ----------
+  function polar(cx, cy, r, angleDeg){
+    const a = (angleDeg - 90) * Math.PI / 180;
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  }
+
+  function depthVisual(depth){
+    const capped = Math.min(depth, 24);
+    const t = capped / 24;
+    return {
+      radius: 20 + t * 16,
+      opacity: 0.35 + t * 0.65,
+      haloOpacity: 0.15 + t * 0.55,
+      color: t < 0.15 ? '#4c525f' : (t < 0.6 ? '#00D4C8' : '#F5C842')
+    };
+  }
+
+  function totalPoints(){
+    return DOMAINS.reduce((sum, d) => sum + state.domains[d.id].distilled.length, 0);
+  }
+  function touchedDomains(){
+    return DOMAINS.filter(d => state.domains[d.id].distilled.length > 0).length;
+  }
+
+  function renderSky(){
+    const cx = 450, cy = 450, r = 320;
+    let svg = '';
+
+    // connecting lines
+    DOMAINS.forEach((d, i) => {
+      const p = polar(cx, cy, r, (360 / DOMAINS.length) * i);
+      const depth = state.domains[d.id].depth;
+      const t = Math.min(depth, 24) / 24;
+      svg += `<line x1="${cx}" y1="${cy}" x2="${p.x}" y2="${p.y}" stroke="${t>0.5?'#F5C842':'#00D4C8'}" stroke-width="1" opacity="${0.06 + t*0.3}" />`;
+    });
+
+    // center hub
+    const pts = totalPoints();
+    const hubT = Math.min(pts, 60) / 60;
+    svg += `<circle cx="${cx}" cy="${cy}" r="${10 + hubT*8}" fill="#050508" stroke="#F5C842" stroke-width="1.5" opacity="0.9"/>`;
+    svg += `<circle cx="${cx}" cy="${cy}" r="${22 + hubT*14}" fill="none" stroke="#F5C842" stroke-width="1" opacity="${0.15+hubT*0.3}"/>`;
+    svg += `<text x="${cx}" y="${cy+4}" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" fill="#8a8f9c" letter-spacing="1">YOU</text>`;
+
+    // domain nodes
+    DOMAINS.forEach((d, i) => {
+      const p = polar(cx, cy, r, (360 / DOMAINS.length) * i);
+      const dv = depthVisual(state.domains[d.id].depth);
+      const labelP = polar(cx, cy, r + 34, (360 / DOMAINS.length) * i);
+      const subP = polar(cx, cy, r + 50, (360 / DOMAINS.length) * i);
+      svg += `
+        <g class="node-group" data-domain="${d.id}" tabindex="0" role="button" aria-label="${d.name} — ${state.domains[d.id].distilled.length} data points">
+          <circle class="halo" cx="${p.x}" cy="${p.y}" r="${dv.radius + 10}" fill="${dv.color}" opacity="${dv.haloOpacity*0.35}"/>
+          <circle cx="${p.x}" cy="${p.y}" r="${dv.radius}" fill="${dv.color}" opacity="${dv.opacity*0.18}" stroke="${dv.color}" stroke-width="1.5" stroke-opacity="${dv.opacity}"/>
+          <text class="node-label" x="${labelP.x}" y="${labelP.y}">${d.name}</text>
+          <text class="node-sub" x="${subP.x}" y="${subP.y}">${state.domains[d.id].distilled.length} pts</text>
+        </g>`;
+    });
+
+    sky.innerHTML = svg;
+    sky.querySelectorAll('.node-group').forEach(g => {
+      g.addEventListener('click', () => openDrawer(g.getAttribute('data-domain')));
+      g.addEventListener('keydown', (e) => { if(e.key==='Enter' || e.key===' '){ e.preventDefault(); openDrawer(g.getAttribute('data-domain')); }});
+    });
+  }
+
+  function render(){
+    renderSky();
+    $('statPoints').textContent = totalPoints();
+    $('statDomains').textContent = touchedDomains();
+  }
+
+  // ---------- Drawer / interview ----------
+  function openDrawer(domainId){
+    activeDomain = domainId;
+    const d = DOMAINS.find(x => x.id === domainId);
+    const dstate = state.domains[domainId];
+    $('dTitle').textContent = d.name;
+    $('dDesc').textContent = d.desc;
+
+    if(dstate.messages.length === 0){
+      dstate.messages.push({ role:'assistant', content: d.seed });
+      saveState();
+    }
+    renderChat();
+    drawer.classList.add('open');
+    overlay.classList.add('show');
+    setTimeout(() => answerInput.focus(), 350);
+  }
+
+  function closeDrawer(){
+    drawer.classList.remove('open');
+    overlay.classList.remove('show');
+    activeDomain = null;
+    render();
+  }
+
+  function renderChat(){
+    const dstate = state.domains[activeDomain];
+    chatLog.innerHTML = '';
+    dstate.messages.forEach(m => {
+      const b = document.createElement('div');
+      b.className = 'bubble ' + (m.role === 'user' ? 'user' : 'ai');
+      b.textContent = m.content;
+      chatLog.appendChild(b);
+    });
+    if(dstate.saturated){
+      const note = document.createElement('div');
+      note.className = 'saturated-note';
+      note.textContent = '✦ This domain feels well-explored — keep going anytime, or move to another node.';
+      chatLog.appendChild(note);
+    }
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  function addBubble(role, text){
+    const b = document.createElement('div');
+    b.className = 'bubble ' + (role === 'user' ? 'user' : 'ai');
+    b.textContent = text;
+    chatLog.appendChild(b);
+    chatLog.scrollTop = chatLog.scrollHeight;
+    return b;
+  }
+
+  function addDistilledTags(points){
+    points.forEach(p => {
+      const tag = document.createElement('div');
+      tag.className = 'distilled-tag';
+      tag.innerHTML = `<span class="mark">✦</span><span>${escapeHtml(p)}</span>`;
+      chatLog.appendChild(tag);
+    });
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  function escapeHtml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  async function sendAnswer(){
+    const text = answerInput.value.trim();
+    if(!text || sending || !activeDomain) return;
+    sending = true;
+    $('sendBtn').disabled = true;
+
+    const d = DOMAINS.find(x => x.id === activeDomain);
+    const dstate = state.domains[activeDomain];
+
+    dstate.messages.push({ role:'user', content:text });
+    addBubble('user', text);
+    answerInput.value = '';
+    answerInput.style.height = 'auto';
+    await saveState();
+
+    const thinking = document.createElement('div');
+    thinking.className = 'thinking';
+    thinking.innerHTML = 'listening <span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+    chatLog.appendChild(thinking);
+    chatLog.scrollTop = chatLog.scrollHeight;
+
+    const systemPrompt = `You are conducting a warm, perceptive interview about the user's "${d.name}" (${d.desc}) as part of building their personal second-brain document. This is one of ten life domains being explored.
+
+Given the conversation so far, respond with ONLY a raw JSON object, no markdown fences, no preamble, matching exactly this shape:
+{"distilled": ["concise third-person statement of new, concrete information or insight from the user's last answer", "..."], "reply": "one brief warm acknowledgment (max 1 sentence) plus exactly one thoughtful follow-up question that goes deeper into this domain or opens a new facet of it", "depth_increment": <integer 1-3, how substantive the new information was>, "domain_saturated": <boolean, true only if this domain has been thoroughly explored across many exchanges>}
+
+Rules for "distilled": only include genuinely new facts, values, patterns, or self-insight — not restatements of the question. Write each as a flat, dense, standalone statement suitable for a personal reference document (e.g. "Grew up in a household where..." or "Believes that..."). If the answer contained no new substantive information, return an empty array. Never invent details the user didn't say.`;
+
+    try{
+      const apiMessages = dstate.messages.map(m => ({ role: m.role, content: m.content }));
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: apiMessages
+        })
+      });
+      const data = await response.json();
+      const textBlocks = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n');
+      const clean = textBlocks.replace(/```json|```/g, '').trim();
+      const jsonStart = clean.indexOf('{');
+      const jsonEnd = clean.lastIndexOf('}');
+      if(jsonStart === -1 || jsonEnd === -1 || jsonEnd < jsonStart){
+        throw new Error('No JSON object found in response: ' + clean.slice(0, 200));
+      }
+      const jsonStr = clean.slice(jsonStart, jsonEnd + 1);
+      const parsed = JSON.parse(jsonStr);
+
+      thinking.remove();
+
+      if(Array.isArray(parsed.distilled) && parsed.distilled.length){
+        dstate.distilled.push(...parsed.distilled);
+        addDistilledTags(parsed.distilled);
+      }
+      dstate.depth += (parsed.depth_increment || 1);
+      dstate.saturated = !!parsed.domain_saturated;
+
+      const replyText = parsed.reply || "Tell me more about that.";
+      dstate.messages.push({ role:'assistant', content: replyText });
+      addBubble('ai', replyText);
+
+      if(dstate.saturated){
+        const note = document.createElement('div');
+        note.className = 'saturated-note';
+        note.textContent = '✦ This domain feels well-explored — keep going anytime, or move to another node.';
+        chatLog.appendChild(note);
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+
+      await saveState();
+      $('statPoints').textContent = totalPoints();
+      $('statDomains').textContent = touchedDomains();
+
+    }catch(e){
+      thinking.remove();
+      addBubble('ai', "Something went wrong reaching the interview engine — try sending that again.");
+      console.error(e);
+    }finally{
+      sending = false;
+      $('sendBtn').disabled = false;
+      answerInput.focus();
+    }
+  }
+
+  // ---------- Document compilation ----------
+  function compileMarkdown(){
+    const now = new Date().toISOString().split('T')[0];
+    let md = `# Second Brain\n\n_Last updated: ${now}_\n\n> Compiled through guided interviews across ten domains of self.\n\n---\n\n`;
+    let any = false;
+    DOMAINS.forEach(d => {
+      const pts = state.domains[d.id].distilled;
+      if(pts.length === 0) return;
+      any = true;
+      md += `## ${d.name}\n\n_${d.desc}_\n\n`;
+      pts.forEach(p => { md += `- ${p}\n`; });
+      md += `\n`;
+    });
+    if(!any){
+      md += `_No domains explored yet. Open a node in the constellation to begin._\n`;
+    }
+    return md;
+  }
+
+  function styleMarkdown(md){
+    const escaped = escapeHtml(md);
+    return escaped
+      .replace(/^# (.+)$/m, '<span class="h1"># $1</span>')
+      .replace(/^_Last updated:.*$/m, m => `<span class="meta">${m}</span>`)
+      .replace(/^## (.+)$/gm, '<span class="h2">## $1</span>')
+      .replace(/^- (.+)$/gm, '<span class="bullet">- </span>$1');
+  }
+
+  async function renderDocView(){
+    const el = $('mdpre');
+    el.innerHTML = `<div class="empty-doc">Loading second-brain.md…</div>`;
+    try{
+      const res = await fetch('second-brain.md', { cache: 'no-store' });
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const md = await res.text();
+      if(!md.trim()){
+        el.innerHTML = `<div class="empty-doc">second-brain.md is empty.\nOpen any node in the constellation and start answering — this document grows as you go.</div>`;
+        return;
+      }
+      el.innerHTML = styleMarkdown(md);
+    }catch(e){
+      console.error('Failed to load second-brain.md', e);
+      el.innerHTML = `<div class="empty-doc">Couldn't load second-brain.md (${escapeHtml(e.message)}).\nIf you opened this file directly (file://), your browser may block local file reads — serve this folder over http:// (e.g. \`npx serve\`) and reload.</div>`;
+    }
+  }
+
+  function downloadMd(){
+    const md = compileMarkdown();
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'second-brain.md';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // ---------- Event wiring ----------
+  $('closeDrawer').addEventListener('click', closeDrawer);
+  overlay.addEventListener('click', () => { closeDrawer(); closeDocView(); });
+
+  $('sendBtn').addEventListener('click', sendAnswer);
+  answerInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendAnswer(); }
+  });
+  answerInput.addEventListener('input', () => {
+    answerInput.style.height = 'auto';
+    answerInput.style.height = Math.min(answerInput.scrollHeight, 120) + 'px';
+  });
+
+  function openDocView(){
+    renderDocView();
+    docview.classList.add('open');
+    overlay.classList.add('show');
+  }
+  function closeDocView(){
+    docview.classList.remove('open');
+    if(!drawer.classList.contains('open')) overlay.classList.remove('show');
+  }
+
+  $('viewDocBtn').addEventListener('click', openDocView);
+  $('downloadBtn').addEventListener('click', downloadMd);
+  $('downloadBtn2').addEventListener('click', downloadMd);
+  $('copyBtn').addEventListener('click', async () => {
+    try{
+      const res = await fetch('second-brain.md', { cache: 'no-store' });
+      const md = res.ok ? await res.text() : compileMarkdown();
+      await navigator.clipboard.writeText(md);
+      const btn = $('copyBtn');
+      const old = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(() => btn.textContent = old, 1200);
+    }catch(e){ console.error(e); }
+  });
+
+  window.addEventListener('resize', renderSky);
+
+  loadState();
+})();
+</script>
+</body>
+</html>
