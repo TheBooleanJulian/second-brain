@@ -36,6 +36,37 @@
   .mono{font-family:'JetBrains Mono',monospace;}
   #app{position:relative; width:100vw; height:100vh;}
 
+  /* ---------- Auth screen ---------- */
+  #authScreen{
+    position:fixed; inset:0; z-index:50;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--void);
+  }
+  #authScreen.hidden{display:none;}
+  .auth-card{
+    width:min(360px, 90vw);
+    background:var(--panel); border:1px solid var(--border); border-radius:8px;
+    padding:28px 26px;
+  }
+  .auth-card h1{font-size:19px; font-weight:600; margin-bottom:4px;}
+  .auth-card .eyebrow{font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.18em; color:var(--teal); text-transform:uppercase;}
+  .auth-card p.sub{font-size:12.5px; color:var(--text-dim); margin-top:8px; margin-bottom:18px;}
+  .auth-field{margin-bottom:14px;}
+  .auth-field label{display:block; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dim); margin-bottom:6px;}
+  .auth-field input{
+    width:100%; background:var(--void); color:var(--text);
+    border:1px solid var(--border); border-radius:6px; padding:10px 12px;
+    font-family:'Space Grotesk',sans-serif; font-size:13.5px;
+  }
+  .auth-field input:focus-visible{outline:2px solid var(--teal); outline-offset:2px;}
+  .auth-error{color:#f2718c; font-size:12px; margin-bottom:12px; min-height:1em;}
+  .auth-actions{display:flex; flex-direction:column; gap:10px; margin-top:6px;}
+  .auth-toggle{
+    background:none; border:none; color:var(--text-faint); font-family:'JetBrains Mono',monospace;
+    font-size:11.5px; cursor:pointer; text-align:center; padding:6px;
+  }
+  .auth-toggle:hover{color:var(--teal);}
+
   /* ---------- Header ---------- */
   header{
     position:fixed; top:0; left:0; right:0; z-index:20;
@@ -47,6 +78,12 @@
   .brand{display:flex; flex-direction:column; gap:2px;}
   .brand .eyebrow{font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.18em; color:var(--teal); text-transform:uppercase;}
   .brand h1{font-size:19px; font-weight:600; letter-spacing:-0.01em;}
+  .welcome{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-dim);
+    letter-spacing:0.03em;
+  }
+  .welcome b{color:var(--text); font-weight:600;}
   .header-actions{display:flex; gap:10px;}
   .btn{
     font-family:'JetBrains Mono',monospace;
@@ -231,15 +268,41 @@
 </style>
 </head>
 <body>
-<div id="app">
+
+<div id="authScreen">
+  <div class="auth-card">
+    <span class="eyebrow">Second Brain</span>
+    <h1 id="authTitle">Sign in</h1>
+    <p class="sub" id="authSub">Your document is private to your account.</p>
+    <div class="auth-error" id="authError"></div>
+    <form id="authForm">
+      <div class="auth-field">
+        <label for="authEmail">Email</label>
+        <input type="email" id="authEmail" autocomplete="username" required>
+      </div>
+      <div class="auth-field">
+        <label for="authPassword">Password</label>
+        <input type="password" id="authPassword" autocomplete="current-password" required>
+      </div>
+      <div class="auth-actions">
+        <button type="submit" class="btn primary" id="authSubmit">Sign in</button>
+        <button type="button" class="auth-toggle" id="authToggle">Need an account? Sign up</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
   <header>
     <div class="brand">
       <span class="eyebrow">Second Brain</span>
       <h1>Your Constellation</h1>
     </div>
+    <div class="welcome" id="welcome"></div>
     <div class="header-actions">
       <button class="btn" id="viewDocBtn">Read document</button>
       <button class="btn primary" id="downloadBtn">Download .md</button>
+      <button class="btn" id="logoutBtn">Log out</button>
     </div>
   </header>
 
@@ -298,6 +361,8 @@
   let state = null;
   let activeDomain = null;
   let sending = false;
+  let authMode = 'login';
+  let currentEmail = '';
 
   const $ = (id) => document.getElementById(id);
   const sky = $('sky');
@@ -313,16 +378,88 @@
     return { domains, createdAt: new Date().toISOString() };
   }
 
+  // ---------- Auth ----------
+  async function checkAuth(){
+    try{
+      const res = await fetch('/api/me');
+      if(res.ok){
+        const data = await res.json();
+        currentEmail = data.email;
+        showApp();
+        return;
+      }
+    }catch(e){}
+    showAuthScreen();
+  }
+
+  function showAuthScreen(){
+    $('authScreen').classList.remove('hidden');
+    $('app').style.display = 'none';
+  }
+
+  async function showApp(){
+    $('authScreen').classList.add('hidden');
+    $('app').style.display = '';
+    $('welcome').innerHTML = `Welcome, <b>${escapeHtml(currentEmail.split('@')[0])}</b>`;
+    await loadState();
+  }
+
+  function setAuthMode(mode){
+    authMode = mode;
+    $('authError').textContent = '';
+    if(mode === 'signup'){
+      $('authTitle').textContent = 'Create your account';
+      $('authSub').textContent = 'Your document is private — only you can read it.';
+      $('authSubmit').textContent = 'Sign up';
+      $('authToggle').textContent = 'Already have an account? Sign in';
+      $('authPassword').setAttribute('autocomplete', 'new-password');
+    } else {
+      $('authTitle').textContent = 'Sign in';
+      $('authSub').textContent = 'Your document is private to your account.';
+      $('authSubmit').textContent = 'Sign in';
+      $('authToggle').textContent = "Need an account? Sign up";
+      $('authPassword').setAttribute('autocomplete', 'current-password');
+    }
+  }
+
+  $('authToggle').addEventListener('click', () => setAuthMode(authMode === 'login' ? 'signup' : 'login'));
+
+  $('authForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = $('authEmail').value.trim();
+    const password = $('authPassword').value;
+    $('authError').textContent = '';
+    $('authSubmit').disabled = true;
+    try{
+      const res = await fetch(authMode === 'signup' ? '/api/signup' : '/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if(!res.ok){
+        $('authError').textContent = data.error || 'Something went wrong.';
+        return;
+      }
+      currentEmail = data.email;
+      await showApp();
+    }catch(e){
+      $('authError').textContent = 'Network error — try again.';
+    }finally{
+      $('authSubmit').disabled = false;
+    }
+  });
+
+  $('logoutBtn').addEventListener('click', async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    location.reload();
+  });
+
   async function loadState(){
     try{
-      const res = await window.storage.get('second-brain-profile', false);
-      if(res && res.value){
-        const parsed = JSON.parse(res.value);
-        DOMAINS.forEach(d => { if(!parsed.domains[d.id]) parsed.domains[d.id] = { distilled:[], depth:0, messages:[], saturated:false }; });
-        state = parsed;
-      } else {
-        state = defaultState();
-      }
+      const res = await fetch('/api/state');
+      state = res.ok ? await res.json() : defaultState();
+      DOMAINS.forEach(d => { if(!state.domains[d.id]) state.domains[d.id] = { distilled:[], depth:0, messages:[], saturated:false }; });
     }catch(e){
       state = defaultState();
     }
@@ -331,7 +468,11 @@
 
   async function saveState(){
     try{
-      await window.storage.set('second-brain-profile', JSON.stringify(state), false);
+      await fetch('/api/state', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(state)
+      });
     }catch(e){
       console.error('Storage save failed', e);
     }
@@ -480,7 +621,6 @@
     sending = true;
     $('sendBtn').disabled = true;
 
-    const d = DOMAINS.find(x => x.id === activeDomain);
     const dstate = state.domains[activeDomain];
 
     dstate.messages.push({ role:'user', content:text });
@@ -495,35 +635,15 @@
     chatLog.appendChild(thinking);
     chatLog.scrollTop = chatLog.scrollHeight;
 
-    const systemPrompt = `You are conducting a warm, perceptive interview about the user's "${d.name}" (${d.desc}) as part of building their personal second-brain document. This is one of ten life domains being explored.
-
-Given the conversation so far, respond with ONLY a raw JSON object, no markdown fences, no preamble, matching exactly this shape:
-{"distilled": ["concise third-person statement of new, concrete information or insight from the user's last answer", "..."], "reply": "one brief warm acknowledgment (max 1 sentence) plus exactly one thoughtful follow-up question that goes deeper into this domain or opens a new facet of it", "depth_increment": <integer 1-3, how substantive the new information was>, "domain_saturated": <boolean, true only if this domain has been thoroughly explored across many exchanges>}
-
-Rules for "distilled": only include genuinely new facts, values, patterns, or self-insight — not restatements of the question. Write each as a flat, dense, standalone statement suitable for a personal reference document (e.g. "Grew up in a household where..." or "Believes that..."). If the answer contained no new substantive information, return an empty array. Never invent details the user didn't say.`;
-
     try{
       const apiMessages = dstate.messages.map(m => ({ role: m.role, content: m.content }));
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          system: systemPrompt,
-          messages: apiMessages
-        })
+      const response = await fetch('/api/interview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domainId: activeDomain, messages: apiMessages })
       });
-      const data = await response.json();
-      const textBlocks = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n');
-      const clean = textBlocks.replace(/```json|```/g, '').trim();
-      const jsonStart = clean.indexOf('{');
-      const jsonEnd = clean.lastIndexOf('}');
-      if(jsonStart === -1 || jsonEnd === -1 || jsonEnd < jsonStart){
-        throw new Error('No JSON object found in response: ' + clean.slice(0, 200));
-      }
-      const jsonStr = clean.slice(jsonStart, jsonEnd + 1);
-      const parsed = JSON.parse(jsonStr);
+      const parsed = await response.json();
+      if(!response.ok) throw new Error(parsed.error || 'Interview engine failed');
 
       thinking.remove();
 
@@ -580,31 +700,20 @@ Rules for "distilled": only include genuinely new facts, values, patterns, or se
     return md;
   }
 
-  function styleMarkdown(md){
+  function renderDocView(){
+    const md = compileMarkdown();
+    const el = $('mdpre');
+    if(totalPoints() === 0){
+      el.innerHTML = `<div class="empty-doc">Nothing captured yet.\nOpen any node in the constellation and start answering — this document grows as you go.</div>`;
+      return;
+    }
     const escaped = escapeHtml(md);
-    return escaped
+    const styled = escaped
       .replace(/^# (.+)$/m, '<span class="h1"># $1</span>')
       .replace(/^_Last updated:.*$/m, m => `<span class="meta">${m}</span>`)
       .replace(/^## (.+)$/gm, '<span class="h2">## $1</span>')
       .replace(/^- (.+)$/gm, '<span class="bullet">- </span>$1');
-  }
-
-  async function renderDocView(){
-    const el = $('mdpre');
-    el.innerHTML = `<div class="empty-doc">Loading second-brain.md…</div>`;
-    try{
-      const res = await fetch('second-brain.md', { cache: 'no-store' });
-      if(!res.ok) throw new Error('HTTP ' + res.status);
-      const md = await res.text();
-      if(!md.trim()){
-        el.innerHTML = `<div class="empty-doc">second-brain.md is empty.\nOpen any node in the constellation and start answering — this document grows as you go.</div>`;
-        return;
-      }
-      el.innerHTML = styleMarkdown(md);
-    }catch(e){
-      console.error('Failed to load second-brain.md', e);
-      el.innerHTML = `<div class="empty-doc">Couldn't load second-brain.md (${escapeHtml(e.message)}).\nIf you opened this file directly (file://), your browser may block local file reads — serve this folder over http:// (e.g. \`npx serve\`) and reload.</div>`;
-    }
+    el.innerHTML = styled;
   }
 
   function downloadMd(){
@@ -648,9 +757,7 @@ Rules for "distilled": only include genuinely new facts, values, patterns, or se
   $('downloadBtn2').addEventListener('click', downloadMd);
   $('copyBtn').addEventListener('click', async () => {
     try{
-      const res = await fetch('second-brain.md', { cache: 'no-store' });
-      const md = res.ok ? await res.text() : compileMarkdown();
-      await navigator.clipboard.writeText(md);
+      await navigator.clipboard.writeText(compileMarkdown());
       const btn = $('copyBtn');
       const old = btn.textContent;
       btn.textContent = 'Copied';
@@ -660,7 +767,7 @@ Rules for "distilled": only include genuinely new facts, values, patterns, or se
 
   window.addEventListener('resize', renderSky);
 
-  loadState();
+  checkAuth();
 })();
 </script>
 </body>
